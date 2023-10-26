@@ -1,39 +1,58 @@
 // create web server
-var express = require('express');
-var app = express();
-// create server
-var server = require('http').createServer(app);
-// create socket io
-var io = require('socket.io')(server);
-// create mongoose
-var mongoose = require('mongoose');
-// create model
-var Comment = require('./models/comment.model');
-// connect database
-mongoose.connect('mongodb://localhost:27017/comments', { useNewUrlParser: true });
-// create port
-var port = process.env.PORT || 3000;
-// create public folder
-app.use(express.static('public'));
-// create route
-app.get('/', function(req, res) {
-    res.sendFile(__dirname + '/views/index.html');
+
+// import express
+const express = require('express');
+
+// import file system
+const fs = require('fs');
+
+// import path
+const path = require('path');
+
+// import body-parser
+const bodyParser = require('body-parser');
+
+// create express app
+const app = express();
+
+// set port
+const port = 3000;
+
+// set path for static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// set path for body parser
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// set path for comments.json
+let commentsPath = path.join(__dirname, 'data', 'comments.json');
+
+// get request
+app.get('/comments', (req, res) => {
+    fs.readFile(commentsPath, 'utf8', (err, data) => {
+        if (err) throw err;
+        let comments = JSON.parse(data);
+        res.send(comments);
+    });
 });
-// listen to connection event
-io.on('connection', function(socket) {
-    // listen to add comment event
-    socket.on('addComment', function(data) {
-        // create new comment
-        var comment = new Comment(data);
-        // save new comment
-        comment.save(function(err) {
+
+// post request
+app.post('/comments', (req, res) => {
+    let name = req.body.name;
+    let comment = req.body.comment;
+    fs.readFile(commentsPath, 'utf8', (err, data) => {
+        if (err) throw err;
+        let comments = JSON.parse(data);
+        comments.push({
+            name: name,
+            comment: comment
+        });
+        fs.writeFile(commentsPath, JSON.stringify(comments), (err) => {
             if (err) throw err;
-            // emit new comment
-            io.emit('newComment', comment);
+            res.send(comments);
         });
     });
 });
+
 // listen to port
-server.listen(port, function() {
-    console.log('Server listening on port ' + port);
-});
+app.listen(port, () => console.log(`Server listening on port ${port}!`));
